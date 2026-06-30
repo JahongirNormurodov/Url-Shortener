@@ -1,0 +1,43 @@
+[project]
+name = "url-shortener"
+version = "0.2.0"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.18.4",
+    "asyncpg>=0.31.0",
+    "fastapi[standard]>=0.136.3",
+    "pwdlib[argon2]>=0.3.0",
+    "pydantic[email]>=2.13.4",
+    "pydantic-settings>=2.14.1",
+    "pyjwt>=2.13.0",
+    "python-dotenv>=1.2.2",
+    "redis>=8.0.0",
+    "sqlalchemy>=2.0.50",
+    "uvicorn>=0.49.0",
+    "greenlet>=3.5.1",
+    # Rate-limiting (slowapi uses limits library under the hood)
+    "slowapi>=0.1.9",
+    "limits>=3.6.0",
+    # QR kod generatsiyasi
+    "qrcode[pil]>=8.0",
+    # Async HTTP (Safe Browsing API, webhook delivery)
+    "httpx>=0.28.1",
+    # Async SMTP (email verification)
+    "aiosmtplib>=3.0",
+    # Email/HTML shablonlar
+    "jinja2>=3.1",
+    # python-multipart (form data uchun, FastAPI talab qiladi)
+    "python-multipart>=0.0.20",
+]
+
+[dependency-groups]
+dev = [
+    "aiosqlite>=0.22.1",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=1.4.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -1,0 +1,134 @@
+version: "3.9"
+
+# ──────────────────────────────────────────────
+#  URL Shortener — To'liq stek (Docker Compose)
+#
+#  Xizmatlar:
+#    app       — FastAPI (port 8000)
+#    postgres  — PostgreSQL 16 (port 5432)
+#    redis     — Redis 7 (port 6379)
+#    mailhog   — Fake SMTP serveri (SMTP: 1025, UI: 8025)
+#
+#  Ishga tushirish:
+#    docker compose up -d
+#
+#  Loglarni ko'rish:
+#    docker compose logs -f app
+#
+#  To'xtatish:
+#    docker compose down
+#
+#  To'liq tozalash (volume'lar bilan):
+#    docker compose down -v
+# ──────────────────────────────────────────────
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: urlshortener-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: urlshortener
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis ────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: urlshortener-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --save 60 1 --loglevel warning
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── MailHog (fake SMTP) ──────────────────────
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: urlshortener-mailhog
+    restart: unless-stopped
+    ports:
+      - "1025:1025"   # SMTP port (app shu portga yuboradi)
+      - "8025:8025"   # Web UI — emaillarni brauzerda ko'rish
+    logging:
+      driver: "none"  # MailHog log'larini o'chirish (shovqinli)
+
+  # ── FastAPI app ──────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: urlshortener-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Umumiy
+      APP_NAME: url-shortener
+      ENVIRONMENT: production
+      BASE_URL: http://localhost:8000
+
+      # Database
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/urlshortener
+
+      # Redis
+      REDIS_URL: redis://redis:6379/0
+
+      # JWT — MUHIM: o'zgartiring!
+      JWT_SECRET: change-me-to-a-long-random-secret-key-in-production
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_TTL_SECONDS: 900
+      REFRESH_TOKEN_TTL_SECONDS: 2592000
+
+      # URL tekshirish
+      URL_RESOLVE_DNS: "true"
+
+      # Safe Browsing (ixtiyoriy — kalit bo'lmasa "unknown" qoladi)
+      # SAFE_BROWSING_API_KEY: your-google-api-key
+
+      # Email (MailHog — lokal test uchun)
+      SMTP_HOST: mailhog
+      SMTP_PORT: 1025
+      SMTP_FROM_EMAIL: noreply@url-shortener.local
+      SMTP_FROM_NAME: "URL Shortener"
+      EMAIL_ENABLED: "true"
+
+      # Rate limiting
+      RATE_LIMIT_ENABLED: "true"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  postgres_data:
+    name: urlshortener_postgres_data
+  redis_data:
+    name: urlshortener_redis_data
